@@ -1,0 +1,179 @@
+def Teste (LinhaProduto,Codigo,CentroCusto,Cliente):
+
+    import pandas as pd
+    import plotly.express as px 
+
+    m = input('Ano Inicial: ')
+    n = input('Semana Inicial: ')
+    o = 'a'+m+'s'+n.zfill(2)
+
+    t = input('Ano Final: ')
+    u = input('Semana Final: ')
+    v = 'a'+t+'s'+u.zfill(2)
+
+    df = pd.read_csv(r'1-Vendas_Integrador_100Vies-Rev1.csv')
+    df['ano'] = df['DataVenda'].str[6:10]
+    df['mes'] = df['DataVenda'].str[3:5]
+    df['dia'] = df['DataVenda'].str[0:2]
+    df['data'] = df['ano']+'-'+df['mes']+'-'+df['dia']
+    df['data'] = pd.to_datetime(df['data'])
+    df['semana'] = df['data'].dt.week
+    df['semana'] = df['semana'].apply(str)
+    df['semana'] = df['semana'].apply(lambda x: x.zfill(2))
+    df['ano-semana'] = 'a' + df['ano'] + 's' + df['semana']  
+    df = df.sort_values(by=['ano','mes','dia'])
+
+    df.to_csv(r'DF_Modelado.csv')
+
+    def Teste2 (LinhaProduto):
+        for i in [LinhaProduto]:
+            if i in df.values:
+                df2 = df.loc[df['LinhaProduto'] == i]
+                df2.to_csv(r'LinhaProduto.csv')
+            elif i == 'Todos':
+                df2 = df
+                df2.to_csv(r'LinhaProduto.csv')
+            else:
+                print ("Linha de Produto não existente")
+        return df2 
+
+    df2 = Teste2(LinhaProduto)   
+    
+    def Teste3 (Codigo):
+        for j in [Codigo]:
+            if j in df2.values:
+                df3 = df2.loc[df2['Codigo'] == j]
+                df3.to_csv(r'Codigo.csv')
+            elif j == 'Todos':
+                df3 = df2
+                df3.to_csv(r'Codigo.csv')
+            else:
+                print ("Codigo não pertence a Lista de Produtos selecionada")
+        return df3
+
+    df3 = Teste3(Codigo)
+
+    def Teste4 (CentroCusto):
+        for k in [CentroCusto]:
+            if k in df3.values:
+                df4 = df3.loc[df3['CentroCusto'] == k]
+                df4.to_csv(r'CentroCusto.csv')
+            elif k == 'Todos':
+                df4 = df3
+                df4.to_csv(r'CentroCusto.csv')
+            else:
+                print ("Centro de Custo não vendeu esse componente")
+        return df4
+
+    df4 = Teste4(CentroCusto)
+
+    def Teste5 (Cliente):
+        for l in [Cliente]:
+            if l in df4.values:
+                df5 = df4.loc[df4['Cliente'] == l]
+                df5.to_csv(r'Cliente.csv')
+            elif l == 'Todos':
+                df5 = df4
+                df5.to_csv(r'Cliente.csv')
+            else:
+                print ("Cliente não comprou desse centro de custo")
+        return df5
+    
+    df5 = Teste5(Cliente)
+
+    df6 = df5.groupby(['ano','ano-semana','Codigo','Cliente']).sum().reset_index()
+    df6 = df6.sort_values(by=['ano','ano-semana'])
+    df6.to_csv(r'Intermediario.csv')
+
+    def semanaa (a,b):
+        semanaa = []
+        for i in range(2017,b):
+            i = str(i)
+            for j in range(1,a):
+                j = str(j)
+                j = j.zfill(2)
+                z = 'a' + i + 's' + j
+                semanaa.append(z)
+        return semanaa
+
+    semanaa = semanaa(53,2021)
+
+    def semana ():
+        semana = df6['ano-semana'].to_list()
+        for i in semanaa:
+            if i not in semana:
+                semana.append(i)
+            else:
+                pass
+        return semana
+
+    a = semana()
+
+    def Teste6 (x):
+        semana = []
+        quantidade = []
+        cliente = []
+        codigo = []
+        linha = []
+        z = 0
+        for i in a:
+            if i in df6.values:
+                x = df6.at[z,'Quantidade']
+                y = df6.at[z,'Cliente']
+                w = df6.at[z,'Codigo']
+                t = df6.at[z,'LinhaProduto']
+                semana.append(i)
+                quantidade.append(x)
+                cliente.append(y)
+                codigo.append(w)
+                linha.append(t)
+                z = z+1
+            else:
+                semana.append(i)
+                quantidade.append(0)
+                cliente.append ('')
+                codigo.append('')   
+                linha.append('')           
+                z = z+1
+        dfa = pd.DataFrame({'semana':semana,'linha':linha,'codigo':codigo,'cliente':cliente,'quantidade':quantidade})
+        dfa = dfa.groupby(['semana','cliente','codigo']).sum().reset_index()
+        
+        return dfa 
+    
+    dfa = Teste6(a)
+    dfa = dfa.reset_index()
+    dfa = dfa.sort_values(by='index')
+    dfaa = dfa.groupby(['semana']).sum().reset_index()
+    dfaa = dfaa.sort_values(by='semana')
+
+    dfa = dfa.loc[dfa['semana'] >= o]
+    dfaa = dfaa.loc[dfaa['semana'] >= o]
+
+    dfa = dfa.loc[dfa['semana'] <= v]
+    dfaa = dfaa.loc[dfaa['semana'] <= v]
+
+    dfa['semana'] = dfa['semana'].str[5:8] + dfa['semana'].str[0:5]
+    dfaa['semana'] = dfaa['semana'].str[5:8] + dfaa['semana'].str[0:5]
+    suporte = dfa['semana'].to_list()
+    
+    dfa.to_csv(r'GraficoBarra.csv')
+    dfaa.to_csv(r'GraficoLinha.csv')
+
+    fig = px.bar(dfa , x='semana' , y='quantidade' , color='cliente' , hover_name='codigo' ,
+                 category_orders={'semana':suporte} , template='plotly_dark' ,
+                 color_discrete_sequence=px.colors.sequential.Greys)
+    fig.update_layout(title='Linha: '+str(LinhaProduto)+' - Componente: '+str(Codigo)+
+                      ' - Centro de Custo: '+str(CentroCusto)+' - Cliente: '+str(Cliente))
+
+    fig2 = px.line(dfaa , x='semana' , y='quantidade' ,
+                   template='plotly_dark' )
+    fig2.update_traces(line_color='grey')
+    fig2.update_layout(title='Linha: '+str(LinhaProduto)+' - Componente: '+str(Codigo)+
+                       ' - Centro de Custo: '+str(CentroCusto)+' - Cliente: '+str(Cliente))
+    
+
+    fig.show()
+    fig2.show()
+    
+
+Teste(1,'Todos',21320,'Todos')
