@@ -1,0 +1,204 @@
+def Teste (LinhaProduto,Codigo,CentroCusto,Cliente):
+
+    import pandas as pd
+    from datetime import timedelta, date 
+    import plotly.express as px 
+    import plotly.graph_objects as go
+
+    m = input('Data Inicial: ')
+
+    t = input('Data Final: ')
+
+    df = pd.read_csv(r'C:\Users\fgolo\Desktop\Integrador\1-Vendas_Integrador_100Vies-Rev1.csv')
+
+    def Teste2 (LinhaProduto):
+        for i in [LinhaProduto]:
+            if i in df.values:
+                df2 = df.loc[df['LinhaProduto'] == i]
+                df2.to_csv(r'C:\Users\fgolo\Desktop\Teste\LinhaProduto.csv')
+            elif i == 'Todos':
+                df2 = df
+                df2.to_csv(r'C:\Users\fgolo\Desktop\Teste\LinhaProduto.csv')
+            else:
+                print ("Linha de Produto não existente")
+        return df2 
+
+    df2 = Teste2(LinhaProduto)   
+    
+    def Teste3 (Codigo):
+        for j in [Codigo]:
+            if j in df2.values:
+                df3 = df2.loc[df2['Codigo'] == j]
+                df3.to_csv(r'C:\Users\fgolo\Desktop\Teste\Codigo.csv')
+            elif j == 'Todos':
+                df3 = df2
+                df3.to_csv(r'C:\Users\fgolo\Desktop\Teste\Codigo.csv')
+            else:
+                print ("Codigo não pertence a Lista de Produtos selecionada")
+        return df3
+
+    df3 = Teste3(Codigo)
+
+    def Teste4 (CentroCusto):
+        for k in [CentroCusto]:
+            if k in df3.values:
+                df4 = df3.loc[df3['CentroCusto'] == k]
+                df4.to_csv(r'C:\Users\fgolo\Desktop\Teste\CentroCusto.csv')
+            elif k == 'Todos':
+                df4 = df3
+                df4.to_csv(r'C:\Users\fgolo\Desktop\Teste\CentroCusto.csv')
+            else:
+                print ("Centro de Custo não vendeu esse componente")
+        return df4
+
+    df4 = Teste4(CentroCusto)
+
+    def Teste5 (Cliente):
+        for l in [Cliente]:
+            if l in df4.values:
+                df5 = df4.loc[df4['Cliente'] == l]
+            elif l == 'Todos':
+                df5 = df4
+            else:
+                print ("Cliente não comprou desse centro de custo")
+        return df5
+    
+    df5 = Teste5(Cliente)
+
+    dfr = df5.drop(columns=['Descricao','NotaFiscal','DataVenda','Quantidade','LinhaProduto','ClienteGrupo',
+                       'Cliente','CentroCusto','EstoqueMinimo','DataUltimaCompra','DataUltimaVenda'])
+    valor = df5['Codigo'].value_counts()
+    dfr = valor.rename_axis('Codigo').reset_index(name='Contagem')
+
+    x = []
+    a = 1
+
+    for i in dfr['Codigo']:
+        x.append(a)
+        a = a+1
+    dfr['Ranking'] = x
+
+    df5 = pd.merge(df5,dfr,how='outer')
+    df5 = df5.sort_values(by='Ranking')
+
+    df5.to_csv(r'C:\Users\fgolo\Desktop\Teste\Cliente.csv')
+
+    df6 = df5.groupby(['DataVenda','Codigo','Ranking','Cliente']).sum().reset_index()
+    df6 = df6.sort_values(by=['DataVenda'])
+    df6.to_csv(r'C:\Users\fgolo\Desktop\Teste\Intermediario.csv')
+
+    def daterange (date1,date2):
+        for i in range(int((date2-date1).days)+1):
+            yield date1 +timedelta(i)
+
+    inicio = date(2017,1,1)
+    fim = date(2020,12,31)
+    dataA = []
+    for dt in daterange(inicio,fim):
+        dataA.append(dt.strftime('%d-%m-%Y'))
+
+    def dataAA ():
+        data = df6['DataVenda'].to_list()
+        for i in dataA:
+            if i not in data:
+                data.append(i)
+            else:
+                pass
+        return data
+
+    a = dataAA()
+
+    def Teste6 (x):
+        data = []
+        quantidade = []
+        cliente = []
+        codigo = []
+        ranking = []
+        linha = []
+        z = 0
+        for i in a:
+            if i in df6.values:
+                x = df6.at[z,'Quantidade']
+                y = df6.at[z,'Cliente']
+                w = df6.at[z,'Codigo']
+                t = df6.at[z,'LinhaProduto']
+                l = df6.at[z,'Ranking']
+                data.append(i)
+                quantidade.append(x)
+                cliente.append(y)
+                codigo.append(w)
+                ranking.append(l)
+                linha.append(t)
+                z = z+1
+            else:
+                data.append(i)
+                quantidade.append(0)
+                cliente.append ('')
+                codigo.append('')
+                ranking.append('')   
+                linha.append('')           
+                z = z+1
+        dfa = pd.DataFrame({'data':data,'linha':linha,'codigo':codigo,'cliente':cliente,'quantidade':quantidade,
+                           'ranking':ranking})
+        return dfa 
+    
+    dfa = Teste6(a)
+    dfb = dfa
+    dfb = dfb.groupby(['codigo','ranking']).sum().reset_index()
+    dfb['ranking'] = pd.to_numeric(dfb['ranking'])
+    dfb = dfb.sort_values(by='ranking')
+    dfa = dfa.groupby(['data','cliente','codigo']).sum().reset_index()
+    dfa['ano'] = dfa['data'].str[6:10]
+    dfa['mes'] = dfa['data'].str[3:5]
+    dfa['dia'] = dfa['data'].str[0:2]
+    dfa['data'] = pd.to_datetime(dfa['data'],dayfirst=True)
+    dfa['semana'] = dfa['data'].dt.week
+    dfa['semana'] = dfa['semana'].apply(str)
+    dfa['semana'] = dfa['semana'].apply(lambda x: x.zfill(2))
+    dfa['ano-semana'] = 'a' + dfa['ano'] + 's' + dfa['semana'] 
+    dfa = dfa.sort_values(by=['ano','mes','dia'])
+
+    dfa = dfa.loc[dfa['data'] >= m]
+
+    dfa = dfa.loc[dfa['data'] <= t]
+
+    dfaa = dfa.groupby(['ano-semana']).sum().reset_index()
+    dfaa = dfaa.sort_values(by='ano-semana')
+
+    dfa['primeiro_dia_semana'] = dfa['data'].dt.weekday
+    dfa['suporte'] = dfa.apply(lambda x: x['data'] - timedelta(days=x['primeiro_dia_semana']), axis=1)
+    dfa['semana-ano'] = dfa['ano-semana'].str[5:8] + dfa['ano-semana'].str[0:5]
+    dfts = dfa.set_index('suporte')
+    dfts = dfts.groupby(['suporte']).sum().reset_index()
+    dfaa['semana-ano'] = dfaa['ano-semana'].str[5:8] + dfaa['ano-semana'].str[0:5]
+    suporte = dfa['semana-ano'].to_list()
+    
+    dfb.to_csv(r'C:\Users\fgolo\Desktop\Teste\Tabela.csv')
+    dfa.to_csv(r'C:\Users\fgolo\Desktop\Teste\GraficoBarra.csv')
+    dfaa.to_csv(r'C:\Users\fgolo\Desktop\Teste\GraficoLinha.csv')
+    dfts.to_csv(r'C:\Users\fgolo\Desktop\Teste\TimeSeries.csv')
+
+    fig = go.Figure(data=[go.Table(header = dict(values=["codigo","ranking","quantidade"],font=dict(size=10),align='left'),
+                   cells=dict(values=[dfb[k].tolist() for k in dfb.columns[0:]],align='left'))])
+    fig.update_layout(height=350)
+
+    fig1 = px.bar(dfa , x='semana-ano' , y='quantidade' , color='cliente' , hover_name='codigo' ,
+                 category_orders={'semana':suporte} , template='plotly_dark' ,
+                 color_discrete_sequence=px.colors.sequential.Greys)
+    fig1.update_layout(title='Linha: '+str(LinhaProduto)+' - Componente: '+str(Codigo)+
+                      ' - Centro de Custo: '+str(CentroCusto)+' - Cliente: '+str(Cliente))
+
+    fig2 = px.line(dfaa , x='semana-ano' , y='quantidade' ,
+                   template='plotly_dark' )
+    fig2.update_traces(line_color='grey')
+    fig2.update_layout(title='Linha: '+str(LinhaProduto)+' - Componente: '+str(Codigo)+
+                       ' - Centro de Custo: '+str(CentroCusto)+' - Cliente: '+str(Cliente) ,
+                       xaxis_rangeslider_visible=True)
+    
+
+    fig.show()
+    fig1.show()
+    fig2.show()
+    
+
+Teste('Todos','Todos',21320,'Todos')
