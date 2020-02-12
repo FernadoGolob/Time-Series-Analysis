@@ -1,0 +1,124 @@
+import pandas as pd 
+import numpy as np 
+import itertools
+from pylab import rcParams
+from sklearn.linear_model import LinearRegression
+import plotly.express as px 
+from matplotlib import pyplot as plt 
+from sklearn.metrics import r2_score, median_absolute_error, mean_absolute_error
+from sklearn.metrics import median_absolute_error, mean_squared_error, mean_squared_log_error
+from statsmodels.tsa.seasonal import seasonal_decompose
+
+import statsmodels.formula.api as smf          
+import statsmodels.tsa.api as smt
+import statsmodels.api as sm
+import scipy.stats as scs
+
+from itertools import product     
+
+def mean_absolute_percentage_error(y_true, y_pred): 
+    return np.mean(np.abs((y_true - y_pred) / y_true)) * 100
+
+df = pd.read_csv(r'C:\Users\fgolo\Desktop\Teste\TimeSeries.csv')
+
+df = df.drop(columns=['primeiro_dia_semana','Unnamed: 0'])
+
+df = df.groupby(['suporte']).sum().reset_index()
+df['suporte'] = pd.to_datetime(df['suporte'],dayfirst=True)
+df = df.set_index(['suporte'])
+
+res = seasonal_decompose(df['quantidade'] , period=26)
+resplot = res.plot()
+#plt.show()
+
+def tsplot(y, lags=None, figsize=(12, 7), style='bmh'):
+
+    if not isinstance(y, pd.Series):
+        y = pd.Series(y)
+        
+    with plt.style.context(style):    
+        fig = plt.figure(figsize=figsize)
+        layout = (2, 2)
+        ts_ax = plt.subplot2grid(layout, (0, 0), colspan=2)
+        acf_ax = plt.subplot2grid(layout, (1, 0))
+        pacf_ax = plt.subplot2grid(layout, (1, 1))
+        
+        y.plot(ax=ts_ax)
+        p_value = sm.tsa.stattools.adfuller(y)[1]
+        ts_ax.set_title('Time Series Analysis Plots\n Dickey-Fuller: p={0:.5f}'.format(p_value))
+        smt.graphics.plot_acf(y, lags=lags, ax=acf_ax)
+        smt.graphics.plot_pacf(y, lags=lags, ax=pacf_ax)
+        plt.tight_layout()
+
+tsplot(df['quantidade'], lags=30)
+
+ads_diff = df['quantidade'] - df['quantidade'].shift(26)
+tsplot(ads_diff[26:], lags=30)
+
+ps = range(0, 5)
+d=1 
+qs = range(0, 5)
+Ps = range(0, 2)
+D=1 
+Qs = range(0, 2)
+s = 26 
+
+parameters = itertools.product(ps, qs, Ps, Qs)
+parameters_list = list(parameters)
+len(parameters_list)
+
+def optimizeSARIMA(parameters_list, d, D, s):
+    
+    results = []
+    best_aic = float("inf")
+
+    for param in parameters_list:
+        try:
+            model=sm.tsa.statespace.SARIMAX(df['quantidade'], order=(param[0], d, param[1]), 
+                                            seasonal_order=(param[2], D, param[3], s)).fit(disp=-1)
+        except:
+            continue
+        aic = model.aic
+        if aic < best_aic:
+            best_model = model
+            best_aic = aic
+            best_param = param
+        results.append([param, model.aic])
+
+    result_table = pd.DataFrame(results)
+    result_table.columns = ['parameters', 'aic']
+    result_table = result_table.sort_values(by='aic', ascending=True).reset_index(drop=True)
+    
+    return result_table
+
+result_table = optimizeSARIMA(parameters_list, d, D, s)
+
+p, q, P, Q = result_table.parameters[0]
+
+best_model=sm.tsa.statespace.SARIMAX(df['quantidade'], order=(p, d, q), 
+                                        seasonal_order=(P, D, Q, s)).fit(disp=-1)
+print(best_model.summary())
+
+tsplot(best_model.resid[26:], lags=30)
+
+def plotSARIMA(series, model, n_steps):
+
+    data = series.copy()
+    data.columns = ['actual']
+    data['arima_model'] = model.fittedvalues
+    data['arima_model'][:s+d] = np.NaN
+    
+    forecast = model.predict(start = data.shape[0], end = data.shape[0]+n_steps)
+    forecast = data.arima_model.append(forecast)
+    error = mean_absolute_error(data['actual'][s+d:], data['arima_model'][s+d:])
+
+    plt.figure(figsize=(15, 7))
+    plt.title("Mean Absolute Error: {0:.2f}%".format(error))
+    plt.plot(forecast, color='r', label="model")
+    plt.axvspan(data.index[-1], forecast.index[-1], alpha=0.5, color='lightgrey')
+    plt.plot(data.actual, label="actual")
+    plt.legend()
+    plt.grid(True)
+    
+plotSARIMA(df, best_model, 52)
+plt.show()
